@@ -10,25 +10,9 @@ import (
 	"os"
 )
 
-type RSAParams struct {
-	PrivateKeyPath string
-	PublicKeyPath  string
-	KeySize        int
-}
-
-func DefaultRSA() *RSAParams {
-	return &RSAParams{
-		PrivateKeyPath: "private_key.pem",
-		PublicKeyPath:  "public_key.pem",
-		KeySize:        2048,
-	}
-}
-
-const ()
-
 func GenerateKeypair(params *RSAParams) {
 	if params.KeySize != 1024 && params.KeySize != 2048 && params.KeySize != 4096 {
-		log.Fatalf("Invalid key size: The key size can not %d", params.KeySize)
+		log.Fatalf("Invalid key size: The key size will not %d", params.KeySize)
 	}
 
 	// Generate RSA Key Pair

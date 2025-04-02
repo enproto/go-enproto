@@ -1,2 +1,0 @@
-# If you run go test -v rsa, generating test keypair
-*.pem
