@@ -1,2 +1,2 @@
 # go-enproto
-EnProto implement by Go
+EnProto implemented by Go
