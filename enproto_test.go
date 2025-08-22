@@ -2,10 +2,10 @@ package enproto_test
 
 import (
 	"testing"
+	"time"
 
-	"github.com/enproto/go-enproto/client"
 	"github.com/enproto/go-enproto/keypair"
-	"github.com/enproto/go-enproto/server"
+	"github.com/enproto/go-enproto/service"
 )
 
 func TestEnprotoKeyGen(t *testing.T) {
@@ -21,12 +21,12 @@ func TestEnprotoKeyGen(t *testing.T) {
 	})
 
 	t.Run("LoadFromFile", func(t *testing.T) {
-		_, err := server.LoadServerFromFile("private.pem", "public.pem", nil)
+		_, err := service.LoadServerFromFile("private.pem", "public.pem", nil)
 		if err != nil {
 			t.Fatalf("Failed to load server from file: %v", err)
 		}
 
-		_, err = client.LoadClientFromFile("public.pem", nil)
+		_, err = service.LoadClientFromFile("public.pem", nil)
 		if err != nil {
 			t.Fatalf("Failed to load client from file: %v", err)
 		}
@@ -38,12 +38,12 @@ func TestEnprotoKeyGen(t *testing.T) {
 			t.Fatalf("Failed to generate key pair: %v", err)
 		}
 
-		_, err = server.LoadServer(kp, &server.Config{TCPAddress: "127.0.0.11", TCPPort: 8080})
+		_, err = service.LoadServer(kp, &service.ServerConfig{TCPAddress: "127.0.0.11", TCPPort: 8080})
 		if err != nil {
 			t.Fatalf("Failed to load server from key pair: %v", err)
 		}
 
-		_, err = client.LoadClient(kp.PublicKey, &client.Config{ServerIP: "127.0.0.11", ServerPort: 8080})
+		_, err = service.LoadClient(kp, &service.ClientConfig{ServerIP: "127.0.0.11", ServerPort: 8080})
 		if err != nil {
 			t.Fatalf("Failed to load client from key pair: %v", err)
 		}
@@ -62,27 +62,30 @@ func TestEnprotoService(t *testing.T) {
 		}
 	})
 
-	var serv *server.Server
-	var cli1 *client.Client
-	var cli2 *client.Client
+	var serv *service.Server
+	var cli1 *service.Client
+	var cli2 *service.Client
 	var err error
 
+	var recvs []*service.Client
+
 	t.Run("Load", func(t *testing.T) {
-		serv, err = server.LoadServerFromFile("private.pem", "public.pem", &server.Config{TCPAddress: "127.0.0.1", TCPPort: 8080})
+		serv, err = service.LoadServerFromFile("private.pem", "public.pem", &service.ServerConfig{TCPAddress: "127.0.0.1", TCPPort: 8080})
 		if err != nil {
 			t.Fatalf("Failed to load server from key pair: %v", err)
 		}
 
-		cli1, err = client.LoadClientFromFile("public.pem", &client.Config{ServerIP: "127.0.0.1", ServerPort: 8080})
+		cli1, err = service.LoadClientFromFile("public.pem", &service.ClientConfig{ServerIP: "127.0.0.1", ServerPort: 8080})
 		if err != nil {
 			t.Fatalf("Failed to load client from key pair: %v", err)
 		}
 
-		cli2, err = client.LoadClientFromFile("public.pem", &client.Config{ServerIP: "127.0.0.1", ServerPort: 8080})
+		cli2, err = service.LoadClientFromFile("public.pem", &service.ClientConfig{ServerIP: "127.0.0.1", ServerPort: 8080})
 		if err != nil {
 			t.Fatalf("Failed to load client from key pair: %v", err)
 		}
 	})
+
 	t.Run("StartAndConnect", func(t *testing.T) {
 		err = serv.Start()
 		if err != nil {
@@ -99,8 +102,11 @@ func TestEnprotoService(t *testing.T) {
 			t.Fatalf("Failed to connect client: %v", err)
 		}
 	})
+
 	t.Run("ReceiveClients", func(t *testing.T) {
-		recvs := serv.ReceiveClients()
+		time.Sleep(100 * time.Millisecond)
+
+		recvs = serv.ReceiveClients()
 		if recvs == nil {
 			t.Fatal("Failed to receive client")
 		}
@@ -109,9 +115,53 @@ func TestEnprotoService(t *testing.T) {
 			t.Fatalf("Failed to receive all clients: %d", len(recvs))
 		}
 	})
+
 	t.Run("Logging", func(t *testing.T) {
 		for _, l := range serv.Logs() {
 			t.Logf("Server log: %s", l)
+		}
+	})
+
+	t.Run("ReadAndWrite", func(t *testing.T) {
+		msg1 := []byte("Hello, Enproto!")
+		msg2 := []byte("Goodbye, Enproto!")
+
+		err = cli1.WriteSecure(msg1)
+		if err != nil {
+			t.Fatalf("Failed to write secure message: %v", err)
+		}
+
+		err = cli2.WriteSecure(msg1)
+		if err != nil {
+			t.Fatalf("Failed to write secure message: %v", err)
+		}
+
+		for _, c := range recvs {
+			_, plaintext, err := c.ReadSecure()
+			if err != nil {
+				t.Fatalf("Failed to read secure message: %v", err)
+			}
+			if string(plaintext) != string(msg1) {
+				t.Fatalf("Unexpected plaintext: %q", plaintext)
+			}
+
+			c.WriteSecure(msg2)
+		}
+
+		_, plain, err := cli1.ReadSecure()
+		if err != nil {
+			t.Fatalf("Failed to read secure message: %v", err)
+		}
+		if string(plain) != string(msg2) {
+			t.Fatalf("Unexpected plaintext: %q", plain)
+		}
+
+		_, plain, err = cli2.ReadSecure()
+		if err != nil {
+			t.Fatalf("Failed to read secure message: %v", err)
+		}
+		if string(plain) != string(msg2) {
+			t.Fatalf("Unexpected plaintext: %q", plain)
 		}
 	})
 }

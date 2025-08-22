@@ -13,9 +13,6 @@ type KeyPair struct {
 	PublicKey  *rsa.PublicKey
 }
 
-// PublicKey is a type alias for *rsa.PublicKey.
-type PublicKey *rsa.PublicKey
-
 // GenerateRSAKeyPair generates a new RSA key pair.
 func GenerateRSAKeyPair(size int) (*KeyPair, error) {
 	privKey, err := rsa.GenerateKey(rand.Reader, size)
@@ -42,7 +39,9 @@ func SaveKeyPair(keyPair *KeyPair, privatePath, publicPath string) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(publicPath, pubKeyBytes, 0644); err != nil {
+
+	err = os.WriteFile(publicPath, pubKeyBytes, 0644)
+	if err != nil {
 		return err
 	}
 

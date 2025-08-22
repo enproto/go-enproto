@@ -1,4 +1,4 @@
-package server
+package service
 
 import (
 	"crypto/rsa"
@@ -10,7 +10,7 @@ import (
 )
 
 // LoadServerFromFile loads the server's key pair from the specified files.
-func LoadServerFromFile(privateKeyPath string, publicKeyPath string, config *Config) (*Server, error) {
+func LoadServerFromFile(privateKeyPath string, publicKeyPath string, config *ServerConfig) (*Server, error) {
 	privKeyBytes, err := os.ReadFile(privateKeyPath)
 	if err != nil {
 		return nil, err
@@ -42,7 +42,7 @@ func LoadServerFromFile(privateKeyPath string, publicKeyPath string, config *Con
 	}
 
 	if config == nil {
-		config = DefaultConfig()
+		config = DefaultServerConfig()
 	}
 
 	logChan := make(chan string, 100)
@@ -52,15 +52,14 @@ func LoadServerFromFile(privateKeyPath string, publicKeyPath string, config *Con
 		keyPair:    keypair,
 		config:     config,
 		clientChan: make(chan *Client),
-		errorChan:  make(chan error),
 		logChan:    logChan,
 	}, nil
 }
 
 // LoadServer loads the server's key pair from the specified files.
-func LoadServer(keyPair *keypair.KeyPair, config *Config) (*Server, error) {
+func LoadServer(keyPair *keypair.KeyPair, config *ServerConfig) (*Server, error) {
 	if config == nil {
-		config = DefaultConfig()
+		config = DefaultServerConfig()
 	}
 
 	logChan := make(chan string, 100)
@@ -70,7 +69,51 @@ func LoadServer(keyPair *keypair.KeyPair, config *Config) (*Server, error) {
 		keyPair:    keyPair,
 		config:     config,
 		clientChan: make(chan *Client),
-		errorChan:  make(chan error),
 		logChan:    logChan,
+	}, nil
+}
+
+// LoadClientFromFile loads the client's public key from the specified file.
+func LoadClientFromFile(publicKeyPath string, config *ClientConfig) (*Client, error) {
+	pubKeyBytes, err := os.ReadFile(publicKeyPath)
+	if err != nil {
+		return nil, err
+	}
+
+	pubKeyInterface, err := x509.ParsePKIXPublicKey(pubKeyBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	pubKey, ok := pubKeyInterface.(*rsa.PublicKey)
+	if !ok {
+		return nil, err
+	}
+
+	if config == nil {
+		config = DefaultClientConfig()
+	}
+
+	return &Client{
+		publicKey: pubKey,
+		config:    config,
+		isLoaded:  true,
+		txSeq:     1,
+		rxSeq:     0,
+	}, nil
+}
+
+// LoadClient loads the client's public key from the specified files.
+func LoadClient(keyPair *keypair.KeyPair, config *ClientConfig) (*Client, error) {
+	if config == nil {
+		config = DefaultClientConfig()
+	}
+
+	return &Client{
+		publicKey: keyPair.PublicKey,
+		config:    config,
+		isLoaded:  true,
+		txSeq:     1,
+		rxSeq:     0,
 	}, nil
 }
